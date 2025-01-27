@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: school_db
+      MYSQL_USER: school_admin
+      MYSQL_PASSWORD: admin123
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  c_server:
+    build:
+      context: ./c_server1
+    depends_on:
+      - mysql
+
+  python_client:
+    build:
+      context: ./python_client
+    depends_on:
+      - mysql
+
+  c_client:
+    build:
+      context: ./c_client
+    depends_on:
+      - mysql
+
+  python_server:
+    build:
+      context: ./python_server1
+    depends_on:
+      - mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: school_admin
+      PMA_PASSWORD: admin123
+    depends_on:
+      - mysql
