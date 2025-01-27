@@ -1,0 +1,88 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import pymysql\
+import os\
+import time\
+\
+# Function to connect to the database\
+def connect_to_db():\
+    try:\
+        connection = pymysql.connect(\
+            host=os.getenv("DB_HOST", "db_container"),  # Use Docker service name or IP address\
+            user=os.getenv("DB_USER", "root"),\
+            password=os.getenv("DB_PASSWORD", "root"),\
+            database=os.getenv("DB_NAME", "points_system")\
+        )\
+        return connection\
+    except pymysql.MySQLError as e:\
+        print(f"Error connecting to the database: \{e\}")\
+        return None\
+\
+# Function to update user points\
+def update_user_points(user_name):\
+    try:\
+        connection = connect_to_db()\
+       if connection is None:\
+            return\
+        with connection.cursor() as cursor:\
+            cursor.execute("""\
+                UPDATE user_points\
+                SET points = points + 10, datetime_stamp = NOW()\
+                WHERE user_name = %s\
+            """, (user_name,))\
+            connection.commit()\
+            print(f"Points for \{user_name\} updated successfully.")\
+        connection.close()\
+    except pymysql.MySQLError as e:\
+        print(f"Error updating points for \{user_name\}: \{e\}")\
+\
+# Function to fetch the latest data from the database\
+def fetch_latest_data():\
+    try:\
+        connection = connect_to_db()\
+        if connection is None:\
+            return "Database connection failed."\
+        with connection.cursor() as cursor:\
+            cursor.execute("""\
+                SELECT user_name, points, datetime_stamp \
+                FROM user_points \
+                ORDER BY datetime_stamp DESC \
+                LIMIT 1\
+            """)\
+            result = cursor.fetchone()\
+        connection.close()\
+        if result:\
+            return \{\
+                "user_name": result[0],\
+                "points": result[1],\
+                "datetime_stamp": result[2]\
+            \}\
+        else:\
+            return "No data found in the database."\
+    except pymysql.MySQLError as e:\
+        return f"Database error: \{e\}"\
+\
+# Main function\
+def main():\
+    user_name = "user1"  # Change this to target the desired user\
+    print(f"Starting point updates for \{user_name\}...")\
+    \
+    while True:\
+        update_user_points(user_name)  # Update user points\
+        latest_data = fetch_latest_data()  # Fetch the latest data\
+\
+        if isinstance(latest_data, dict):\
+            print(f"Latest data: User: \{latest_data['user_name']\}, Points: \{latest_data['points']\}, Time: \{latest_data['date>\
+        else:\
+            print(latest_data)  # Handle error messages or "No data found"\
+\
+        time.sleep(30)  # Wait 30 seconds before the next update\
+\
+if __name__ == "__main__":\
+    main()\
+}
