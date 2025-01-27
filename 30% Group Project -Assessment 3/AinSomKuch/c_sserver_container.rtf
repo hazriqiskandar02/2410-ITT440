@@ -1,0 +1,132 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 #include <stdio.h>\
+#include <stdlib.h>\
+#include <string.h>\
+#include <mariadb/mysql.h>\
+#include <unistd.h>\
+#include <sys/socket.h>\
+#include <netinet/in.h>\
+#include <arpa/inet.h>\
+\
+#define HOST "db_container"\
+#define USER "root"\
+#define PASSWORD "root"\
+#define DATABASE "points_system"\
+\
+MYSQL *conn;\
+MYSQL_RES *res;\
+MYSQL_ROW row;\
+\
+void handle_error(const char *message) \{\
+    fprintf(stderr, "%s error: %s\\n", message, mysql_error(conn));\
+    exit(EXIT_FAILURE);\
+\}\
+\
+void connect_to_db() \{\
+    conn = mysql_init(NULL);\
+    if (conn == NULL) \{\
+        handle_error("mysql_init");\
+    \}\
+\
+    if (mysql_real_connect(conn, HOST, USER, PASSWORD, DATABASE, 0, NULL, 0) == NULL) \{\
+        handle_error("mysql_real_connect");\
+    \}\
+\}\
+\
+void fetch_user_data(const char *user_name, char *response) \{\
+    char query[256];\
+    snprintf(query, sizeof(query), "SELECT user_name, points, datetime_stamp FROM user_points WHERE user_name = '%s' ORDER BY datetime_stamp DESC LIMIT 1", user_name);\
+\
+    if (mysql_query(conn, query)) \{\
+        handle_error("SELECT latest data");\
+    \}\
+\
+    res = mysql_store_result(conn);\
+    if (res == NULL) \{\
+        handle_error("mysql_store_result");\
+    \}\
+\
+    row = mysql_fetch_row(res);\
+    if (row) \{\
+        snprintf(response, 1024, "User: %s, Points: %s, Time: %s", row[0], row[1], row[2]);\
+    \} else \{\
+        snprintf(response, 1024, "No data found for %s.", user_name);\
+    \}\
+\
+    mysql_free_result(res);\
+\}\
+\
+void close_connection() \{\
+    mysql_close(conn);\
+\}\
+\
+void server_socket() \{\
+    int server_fd, client_fd;\
+    struct sockaddr_in server_addr, client_addr;\
+    socklen_t addr_size;\
+    char buffer[1024];\
+    ssize_t read_size;\
+\
+    // Create server socket\
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) \{\
+        perror("Socket creation failed");\
+        exit(EXIT_FAILURE);\
+    \}\
+\
+    server_addr.sin_family = AF_INET;\
+    server_addr.sin_addr.s_addr = INADDR_ANY;\
+    server_addr.sin_port = htons(5002);\
+\
+    if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) \{\
+        perror("Bind failed");\
+        exit(EXIT_FAILURE);\
+    \}\
+\
+    if (listen(server_fd, 3) < 0) \{\
+        perror("Listen failed");\
+        exit(EXIT_FAILURE);\
+    \}\
+\
+    printf("Server listening on port 5002...\\n");\
+\
+    while (1) \{\
+        addr_size = sizeof(client_addr);\
+        if ((client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &addr_size)) < 0) \{\
+            perror("Accept failed");\
+            continue;\
+        \}\
+\
+        read_size = recv(client_fd, buffer, sizeof(buffer), 0);\
+        if (read_size <= 0) \{\
+            perror("Error reading from socket");\
+            close(client_fd);\
+            continue;\
+        \}\
+\
+        buffer[read_size] = '\\0';\
+\
+        if (strcmp(buffer, "REQUEST_USER3_DATA") == 0) \{\
+            char response[1024];\
+            fetch_user_data("user3", response);\
+            send(client_fd, response, strlen(response), 0);\
+        \} else \{\
+            send(client_fd, "Unknown request", 16, 0);\
+        \}\
+\
+        close(client_fd);  // Close the client connection after handling the request\
+    \}\
+\}\
+\
+int main() \{\
+    connect_to_db();\
+    server_socket();\
+    close_connection();\
+    return 0;\
+\}\
+}

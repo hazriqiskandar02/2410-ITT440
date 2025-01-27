@@ -1,0 +1,63 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: mydb
+    networks:
+      - mynetwork
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql  # Persistent storage for MySQL
+  
+  c_server_1:
+    build: ./c_server
+    networks:
+      - mynetwork
+    ports:
+      - "5001:5001"
+  
+  python_server_1:
+    build: ./python_server
+    networks:
+      - mynetwork
+    ports:
+      - "5002:5002"
+
+  c_client_1:
+    build: ./c_client
+    networks:
+      - mynetwork
+    ports:
+      - "6001:6001"
+
+  python_client_1:
+    build: ./python_client
+    networks:
+      - mynetwork
+    ports:
+      - "6002:6002"
+
+  c_server_2:
+    build: ./c_server
+    networks:
+      - mynetwork
+    ports:
+      - "5003:5003"
+  
+  python_client_2:
+    build: ./python_client
+    networks:
+      - mynetwork
+    ports:
+      - "6003:6003"
+
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local

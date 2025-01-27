@@ -1,0 +1,79 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2761
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import pymysql\
+import os\
+\
+def fetch_user_data(user_name="user1"):\
+    """\
+    Fetch the latest data for a specified user from the database.\
+\
+    :param user_name: The username to retrieve data for (default is 'user1').\
+    :return: A formatted string with the user's latest data or an error message.\
+    """\
+    try:\
+        # Connect to the database\
+        connection = pymysql.connect(\
+            host=os.getenv("DB_HOST", "db_container"),  # Use Docker container name for MySQL\
+            user=os.getenv("DB_USER", "root"),\
+            password=os.getenv("DB_PASSWORD", "root"),\
+            database=os.getenv("DB_NAME", "points_system")\
+        )\
+\
+        with connection.cursor() as cursor:\
+            # Query to fetch the latest data for the specified user\
+            query = """\
+                SELECT user_name, points, datetime_stamp \
+                FROM user_points \
+                WHERE user_name = %s \
+                ORDER BY datetime_stamp DESC \
+                LIMIT 1\
+            """\
+            cursor.execute(query, (user_name,))\
+            result = cursor.fetchone()\
+\
+        connection.close()\
+\
+        # Check if a result was found and format the output\
+        if result:\
+            user, points, timestamp = result\
+            return (\
+                "=========================================\\n"\
+                f"          User Data for \{user_name\}\\n"\
+                "=========================================\\n"\
+                "\\n"\
+                "-----------------------------------------\\n"\
+                f"User Name      : \{user\}\\n"\
+                f"Points         : \{points\}\\n"\
+                f"Last Updated   : \{timestamp\}\\n"\
+                "-----------------------------------------\\n"\
+            )\
+        else:\
+            return (\
+                "=========================================\\n"\
+                f"          User Data for \{user_name\}\\n"\
+                "=========================================\\n"\
+                "\\n"\
+                "-----------------------------------------\\n"\
+                f"No data found for user: \{user_name\}.\\n"\
+                "-----------------------------------------\\n"\
+            )\
+\
+    except Exception as e:\
+        return f"Database error: \{e\}"\
+\
+def main():\
+    """\
+    Main function to fetch and display the latest data for a specific user.\
+    """\
+    user_name = "user1"  # Change this to retrieve data for a different user\
+    data = fetch_user_data(user_name)\
+    print(data)\
+\
+if __name__ == "__main__":\
+    main()\
+}
